@@ -55,7 +55,7 @@ public class Statement implements Serializable {
     }
     
     public void setLoc(int loc) {
-        _location = Integer.toHexString(loc).toUpperCase();
+        _location = String.format("%1$04X", loc);
     }
     
     public static Statement parse(String statement) {
