@@ -9,7 +9,7 @@ public class Operation {
     private String _opcode;
     private int _format;
     
-    public Operation(String mnemonic, String opcode, String format) {
+    public Operation(String mnemonic, String format, String opcode) {
         _mnemonic = mnemonic;
         _opcode = opcode;
         
