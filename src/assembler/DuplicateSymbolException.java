@@ -8,7 +8,7 @@ package assembler;
 
 /**
  *
- * @author Scott
+ * @author Malthael
  */
 class DuplicateSymbolException extends Exception {
     public DuplicateSymbolException(Statement statement) {

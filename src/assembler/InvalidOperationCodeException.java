@@ -8,7 +8,7 @@ package assembler;
 
 /**
  *
- * @author Scott
+ * @author Malthael
  */
 class InvalidOperationCodeException extends Exception {
     public InvalidOperationCodeException(Statement statement) {
