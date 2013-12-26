@@ -14,10 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
-/**
- *
- * @author Malthael
- */
 public class Assembler {
     private int _locctr;
     private int _startAddress;

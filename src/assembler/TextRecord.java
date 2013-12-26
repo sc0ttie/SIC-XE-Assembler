@@ -1,18 +1,8 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package assembler;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- *
- * @author Malthael
- */
 public class TextRecord implements Record {
     private int _startAddress;
     private int _length;

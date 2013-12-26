@@ -2,10 +2,6 @@ package assembler;
 
 import java.io.Serializable;
 
-/**
- *
- * @author Malthael
- */
 public class Statement implements Serializable {
     private final String _label;
     private final String _operation;

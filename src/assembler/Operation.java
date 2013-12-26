@@ -1,9 +1,5 @@
 package assembler;
 
-/**
- *
- * @author Malthael
- */
 public class Operation {
     private String _mnemonic;
     private String _opcode;
