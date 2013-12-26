@@ -12,7 +12,7 @@ public class Statement implements Serializable {
     private final String[] _symbols;
     private final String _comment;
     private final boolean _extended;
-    private String _location;
+    private int _location;
     
     private Statement(String label, String operation, boolean extended, String[] symbols, String comment) {
         _label = label;
@@ -55,7 +55,11 @@ public class Statement implements Serializable {
     }
     
     public void setLoc(int loc) {
-        _location = String.format("%1$04X", loc);
+        _location = loc;
+    }
+    
+    public int location() {
+        return _location;
     }
     
     public static Statement parse(String statement) {
@@ -81,8 +85,8 @@ public class Statement implements Serializable {
                 operation = operation.substring(1);
             }
 
+            symbols = new String[2];
             if (index < tokens.length) {
-                symbols = new String[2];
                 int pos = tokens[index].indexOf(',');
                 if (pos >= 0) {
                     symbols[0] = tokens[index].substring(0, pos);
@@ -92,7 +96,7 @@ public class Statement implements Serializable {
                     symbols[1] = null;
                 }
             } else {
-                symbols = null;
+                symbols[0] = symbols[1] = null;
             }
 
             return new Statement(label, operation, extended, symbols);
@@ -101,7 +105,7 @@ public class Statement implements Serializable {
     
     @Override
     public String toString() {
-        String s = _location + "\t";
+        String s = String.format("%1$04X", _location) + "\t";
         
         if (isComment()) {
             s += ".\t" + _comment;
@@ -110,10 +114,18 @@ public class Statement implements Serializable {
                 s += _label;
             }
 
-            s += "\t" + _operation + "\t";
+            s += "\t";
+            
+            if (_extended) {
+                s += '+';
+            }
+            
+            s += _operation + "\t";
 
             if (_symbols != null) {
-                s += _symbols[0];
+                if (_symbols[0] != null) {
+                    s += _symbols[0];
+                }
 
                 if (_symbols[1] != null) {
                     s +=  "," + _symbols[1];

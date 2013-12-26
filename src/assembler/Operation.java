@@ -7,23 +7,12 @@ package assembler;
 public class Operation {
     private String _mnemonic;
     private String _opcode;
-    private int _format;
+    private String _format;
     
     public Operation(String mnemonic, String format, String opcode) {
         _mnemonic = mnemonic;
         _opcode = opcode;
-        
-        switch (format) {
-            case "1":
-                _format = 1;
-                break;
-            case "2":
-                _format = 2;
-                break;
-            case "3/4":
-                _format = 3;
-                break;
-        }
+        _format = format;
     }
     
     public String mnemonic() {
@@ -34,7 +23,7 @@ public class Operation {
         return _opcode;
     }
     
-    public int format() {
+    public String format() {
         return _format;
     }
 }
