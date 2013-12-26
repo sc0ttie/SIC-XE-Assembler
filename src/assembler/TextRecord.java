@@ -18,7 +18,7 @@ public class TextRecord implements Record {
     private int _length;
     private List<String> _objectCodes;
     
-    public static final int MAX_LENGTH = 256;
+    public static final int MAX_LENGTH = 0x20;
     
     public TextRecord(int startAddr) {
         _startAddress = startAddr;
@@ -27,7 +27,9 @@ public class TextRecord implements Record {
     }
     
     public boolean add(String objectCode) {
-        if (_length + objectCode.length() <= MAX_LENGTH) {
+        if (objectCode.length() == 0) {
+            return true;
+        } else if (_length + objectCode.length() <= MAX_LENGTH) {
             _objectCodes.add(objectCode);
             _length += objectCode.length() / 2;
             
@@ -39,10 +41,10 @@ public class TextRecord implements Record {
     
     @Override
     public String toObjectProgram() {
-        String buf = String.format("T%1$06X%2$02X", _startAddress, _length);
+        String buf = String.format("T %06X %02X", _startAddress, _length);
         
         for (String s : _objectCodes) {
-            buf += s;
+            buf += " " + s;
         }
         
         return buf;
