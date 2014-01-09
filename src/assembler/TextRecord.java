@@ -31,10 +31,10 @@ public class TextRecord implements Record {
     
     @Override
     public String toObjectProgram() {
-        String buf = String.format("T %06X %02X", _startAddress, _length);
+        String buf = String.format("T%06X%02X", _startAddress, _length);
         
         for (String s : _objectCodes) {
-            buf += " " + s;
+            buf += s;
         }
         
         return buf;

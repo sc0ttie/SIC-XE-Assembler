@@ -34,7 +34,7 @@ public class Assembler {
     }
     
     public boolean assemble(File input, File output) throws IOException, DuplicateSymbolException, InvalidOperationCodeException, ClassNotFoundException, ExpectedDirectiveNotFoundException {
-        File intermediateFile = new File("passone.tmp");
+        File intermediateFile = new File(".assembler.tmp");
 
         intermediateFile.createNewFile();
 
@@ -264,7 +264,7 @@ public class Assembler {
                     }
                     
                     objCode = String.format(statement.isExtended() ? "%08X" : "%06X", code);
-                
+                    
                     break;
             }
         } else if (statement.operation().compareTo("BYTE") == 0) {
@@ -272,12 +272,17 @@ public class Assembler {
             
             s = s.substring(s.indexOf('\'') + 1, s.lastIndexOf('\''));
             
-            if (statement.operand1().charAt(0) == 'C') {
-                for (char ch : s.toCharArray()) {
-                    objCode += Integer.toHexString(ch).toUpperCase();
-                }
-            } else {
-                objCode = s;
+            switch (statement.operand1().charAt(0)) {
+                case 'C':
+                    for (char ch : s.toCharArray()) {
+                        objCode += Integer.toHexString(ch).toUpperCase();
+                    }
+                
+                    break;
+                case 'X':
+                    objCode = s;
+                    
+                    break;
             }
         } else if (statement.operation().compareTo("WORD") == 0) {
             // convert constant to object code
