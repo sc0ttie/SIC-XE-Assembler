@@ -2,28 +2,30 @@ package assembler;
 
 import java.io.Serializable;
 
-public class Statement implements Serializable {
+public class Statement implements Serializable, Comparable {
     private final String _label;
     private final String _operation;
     private final String[] _symbols;
     private final String _comment;
     private final boolean _extended;
+    private final boolean _literal;
     private int _location;
     
-    private Statement(String label, String operation, boolean extended, String[] symbols, String comment) {
+    private Statement(String label, String operation, boolean extended, boolean literal, String[] symbols, String comment) {
         _label = label;
         _operation = operation;
         _extended = extended;
+        _literal = literal;
         _symbols = symbols;
         _comment = comment;
     }
     
-    public Statement(String label, String operation, boolean extended, String[] symbols) {
-        this(label, operation, extended, symbols, null);
+    public Statement(String label, String operation, boolean extended, boolean literal, String[] symbols) {
+        this(label, operation, extended, literal, symbols, null);
     }
     
     public Statement(String comment) {
-        this(null, ".", false, null, comment);
+        this(null, ".", false, false, null, comment);
     }
     
     public String label() {
@@ -35,7 +37,11 @@ public class Statement implements Serializable {
     }
     
     public String operand1() {
-        return _symbols[0];
+        if (_literal && _symbols[0].compareTo("=*") == 0) {
+            return "#" + _location;
+        } else {
+            return _symbols[0];
+        }
     }
     
     public String operand2() {
@@ -50,7 +56,11 @@ public class Statement implements Serializable {
         return _extended;
     }
     
-    public void setLoc(int loc) {
+    public boolean hasLiteral() {
+        return _literal;
+    }
+    
+    public void setLocation(int loc) {
         _location = loc;
     }
     
@@ -67,6 +77,7 @@ public class Statement implements Serializable {
             String label, operation;
             String[] symbols;
             boolean extended = false;
+            boolean literal = false;
             int index = 0;
 
             if (tokens.length == 3) {
@@ -91,11 +102,15 @@ public class Statement implements Serializable {
                     symbols[0] = tokens[index];
                     symbols[1] = null;
                 }
+                
+                if (symbols[0].charAt(0) == '=') {
+                    literal = true;
+                }
             } else {
                 symbols[0] = symbols[1] = null;
             }
 
-            return new Statement(label, operation, extended, symbols);
+            return new Statement(label, operation, extended, literal, symbols);
         }
     }
     
@@ -110,13 +125,13 @@ public class Statement implements Serializable {
                 s += _label;
             }
 
-            s += "\t";
+            s += '\t';
             
             if (_extended) {
                 s += '+';
             }
             
-            s += _operation + "\t";
+            s += _operation + '\t';
 
             if (_symbols != null) {
                 if (_symbols[0] != null) {
@@ -124,11 +139,16 @@ public class Statement implements Serializable {
                 }
 
                 if (_symbols[1] != null) {
-                    s +=  "," + _symbols[1];
+                    s +=  ',' + _symbols[1];
                 }
             }
         }
         
         return s;
+    }
+
+    @Override
+    public int compareTo(Object o) {
+        return _operation.compareTo((String) o);
     }
 }
