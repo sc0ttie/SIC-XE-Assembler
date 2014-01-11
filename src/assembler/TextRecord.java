@@ -19,7 +19,7 @@ public class TextRecord implements Record {
     public boolean add(String objectCode) {
         if (objectCode.length() == 0) {
             return true;
-        } else if (_length + objectCode.length() <= MAX_LENGTH) {
+        } else if (_length + objectCode.length() / 2 <= MAX_LENGTH) {
             _objectCodes.add(objectCode);
             _length += objectCode.length() / 2;
             
