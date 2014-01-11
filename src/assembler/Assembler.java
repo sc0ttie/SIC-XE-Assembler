@@ -16,6 +16,7 @@ import java.util.Scanner;
 public class Assembler {
     private int _locctr;
     private int _startAddress;
+    private int _firstExecAddress;
     private int _programLength;
     private int _baseAddress;
     private final Map<String, Operation> _opTable;
@@ -30,18 +31,18 @@ public class Assembler {
         _symbolTable.put(null, 0);
     }
     
-    public boolean assemble(File input, File output) throws IOException, ClassNotFoundException {
+    public void assemble(File input, File output) throws IOException, ClassNotFoundException {
         File intermediateFile = new File(".assembler.tmp");
 
-        intermediateFile.createNewFile();
+        try {
+            intermediateFile.createNewFile();
 
-        processPass1(input, intermediateFile);
+            processPass1(input, intermediateFile);
 
-        processPass2(intermediateFile, output);
-
-        intermediateFile.delete();
-        
-        return true;
+            processPass2(intermediateFile, output);
+        } finally {
+            intermediateFile.delete();
+        }
     }
     
     private void processPass1(File input, File output) throws IOException {
@@ -50,6 +51,7 @@ public class Assembler {
              ObjectOutputStream objOutputStream = new ObjectOutputStream(ostream);) {
             
             _locctr = _startAddress = 0;
+            _firstExecAddress = -1;
             
             while (scanner.hasNext()) {
                 try {
@@ -106,6 +108,10 @@ public class Assembler {
                             break;
                         default:
                             if (_opTable.containsKey(statement.operation())) {
+                                if (_firstExecAddress < 0) {
+                                    _firstExecAddress = _locctr;
+                                }
+                                
                                 switch (_opTable.get(statement.operation()).format()) {
                                     case "1":
                                         _locctr += 1;
@@ -183,7 +189,7 @@ public class Assembler {
                 objectProgram.write(r.toObjectProgram() + '\n');
             }
             
-            objectProgram.write(new EndRecord(_startAddress).toObjectProgram() + '\n');
+            objectProgram.write(new EndRecord(_firstExecAddress).toObjectProgram() + '\n');
         }
     }
     
@@ -290,7 +296,7 @@ public class Assembler {
                     break;
             }
         } else if (statement.compareTo("WORD") == 0) {
-            // convert constant to object code
+            objCode = String.format("%06X", statement.operand1());
         } else if (statement.compareTo("BASE") == 0) {
             _baseAddress = _symbolTable.get(statement.operand1());
         } else if (statement.compareTo("NOBASE") == 0) {
