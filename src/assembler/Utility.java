@@ -20,7 +20,9 @@ public class Utility {
         _operationTable.put("LDA",   new Operation("LDA",   "3/4", "00"));
         _operationTable.put("LDB",   new Operation("LDB",   "3/4", "68"));
         _operationTable.put("LDCH",  new Operation("LDCH",  "3/4", "50"));
+        _operationTable.put("LDL",   new Operation("LDL",   "3/4", "08")); // for one-pass
         _operationTable.put("LDT",   new Operation("LDT",   "3/4", "74"));
+        _operationTable.put("LDX",   new Operation("LDX",   "3/4", "04")); // for one-pass
         _operationTable.put("RD",    new Operation("RD",    "3/4", "D8"));
         _operationTable.put("RSUB",  new Operation("RSUB",  "3/4", "4C"));
         _operationTable.put("STA",   new Operation("STA",   "3/4", "0C"));
@@ -28,6 +30,7 @@ public class Utility {
         _operationTable.put("STL",   new Operation("STL",   "3/4", "14"));
         _operationTable.put("STX",   new Operation("STX",   "3/4", "10"));
         _operationTable.put("TD",    new Operation("TD",    "3/4", "E0"));
+        _operationTable.put("TIX",   new Operation("TIX",   "3/4", "2C")); // for one-pass
         _operationTable.put("TIXR",  new Operation("TIXR",  "2",   "B8"));
         _operationTable.put("WD",    new Operation("WD",    "3/4", "DC"));
         
