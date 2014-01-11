@@ -4,9 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class TextRecord implements Record {
-    private int _startAddress;
+    private final int _startAddress;
     private int _length;
-    private List<String> _objectCodes;
+    private final List<String> _objectCodes;
     
     public static final int MAX_LENGTH = 0x20;
     

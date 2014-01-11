@@ -2,7 +2,6 @@ package assembler;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -20,99 +19,79 @@ public class Assembler {
     private int _programLength;
     private int _baseAddress;
     private final Map<String, Operation> _opTable;
+    private final Map<String, Integer> _registerTable;
+    private final Map<String, Integer> _symbolTable;
     
-    public Assembler(File validOp) throws FileNotFoundException {
-        _opTable = new HashMap<>();
+    public Assembler() {
+        _opTable = Utility.getOperaionTable();
+        _registerTable = Utility.getRegisterTable();
         
-        try (Scanner scanner = new Scanner(validOp)) {
-            while (scanner.hasNext()) {
-                String[] buf = scanner.nextLine().split(" ");
-                
-                _opTable.put(buf[0], new Operation(buf[0], buf[1], buf[2]));
-            }
-        }
+        _symbolTable = new HashMap<>();
+        _symbolTable.put(null, 0);
     }
     
-    public boolean assemble(File input, File output) throws IOException, DuplicateSymbolException, InvalidOperationCodeException, ClassNotFoundException, ExpectedDirectiveNotFoundException {
+    public boolean assemble(File input, File output) throws IOException, ClassNotFoundException {
         File intermediateFile = new File(".assembler.tmp");
 
         intermediateFile.createNewFile();
 
-        Map<String, Integer> opTab = passOne(input, intermediateFile);
+        processPass1(input, intermediateFile);
 
-        passTwo(intermediateFile, opTab, output);
+        processPass2(intermediateFile, output);
 
         intermediateFile.delete();
         
         return true;
     }
     
-    private Map<String, Integer> passOne(File input, File output) throws IOException, DuplicateSymbolException, InvalidOperationCodeException, ExpectedDirectiveNotFoundException {
+    private void processPass1(File input, File output) throws IOException {
         try (Scanner scanner = new Scanner(input);
              FileOutputStream ostream = new FileOutputStream(output);
              ObjectOutputStream objOutputStream = new ObjectOutputStream(ostream);) {
             
-            Map<String, Integer> symTab = new HashMap<>();
-            Statement statement = Statement.parse(scanner.nextLine());
-            objOutputStream.writeObject(statement);
-            
-            // put REGISTERs into the symbol table
-            symTab.put(null, 0);
-            symTab.put("A", 0);
-            symTab.put("X", 1);
-            symTab.put("L", 2);
-            symTab.put("B", 3);
-            symTab.put("S", 4);
-            symTab.put("T", 5);
-            symTab.put("F", 6);
-            symTab.put("SW", 9);
-            
-            if (statement.operation().compareTo("START") == 0) {
-                _startAddress = Integer.parseInt(statement.operand1());
-            } else {
-                throw new ExpectedDirectiveNotFoundException("The directive START not found.");
-            }
-            
-            _locctr = _startAddress;
+            _locctr = _startAddress = 0;
             
             while (scanner.hasNext()) {
-                statement = Statement.parse(scanner.nextLine());
-                
-                statement.setLoc(_locctr);
-//                Uncomment the next line can show the Loc and Source statements
-//                System.out.println(statement);
-            
-                if (statement.operation().compareTo("END") != 0) {
-                    if (statement.isComment() == false) {
-                        if (statement.label() != null) {
-                            if (symTab.containsKey(statement.label())) {
-                                throw new DuplicateSymbolException(statement);
-                            } else {
-                                symTab.put(statement.label(), _locctr);
-                            }
+                try {
+                    Statement statement = Statement.parse(scanner.nextLine());
+
+                    if (statement.isComment()) {
+                        continue;
+                    }
+                    
+                    statement.setLocation(_locctr);
+                    
+                    if (statement.label() != null) {
+                        if (_symbolTable.containsKey(statement.label())) {
+                            throw new DuplicateSymbolException(statement);
+                        } else {
+                            _symbolTable.put(statement.label(), _locctr);
                         }
+                    }
+                    
+                    switch (statement.operation()) {
+                        case "START":
+                            _startAddress = Integer.parseInt(statement.operand1());
                         
-                        if (_opTable.containsKey(statement.operation())) {
-                            switch (_opTable.get(statement.operation()).format()) {
-                                case "1":
-                                    _locctr += 1;
-                                    break;
-                                case "2":
-                                    _locctr += 2;
-                                    break;
-                                case "3/4":
-                                    _locctr += 3 + (statement.isExtended() ? 1 : 0);
-                                    break;
-                            }
-                        } else if (statement.operation().compareTo("WORD") == 0) {
+                            statement.setLocation(_locctr = _startAddress);
+                            break;
+                        case "END":
+                            break;
+                        case "WORD":
                             _locctr += 3;
-                        } else if (statement.operation().compareTo("RESW") == 0) {
-                            _locctr += 3 * Integer.parseInt(statement.operand1());
-                        } else if (statement.operation().compareTo("RESB") == 0) {
-                            _locctr += Integer.parseInt(statement.operand1());
-                        } else if (statement.operation().compareTo("BYTE") == 0) {
-                            String s = statement.operand1();
                             
+                            break;
+                        case "RESW":
+                            _locctr += 3 * Integer.parseInt(statement.operand1());
+                            
+                            break;
+                        case "RESB":
+                            _locctr += Integer.parseInt(statement.operand1());
+                            
+                            break;
+                        case "BYTE":
+                            String s = statement.operand1();
+
                             switch (s.charAt(0)) {
                                 case 'C':
                                     _locctr += (s.length() - 3); // C'EOF' -> EOF -> 3 bytes
@@ -121,60 +100,80 @@ public class Assembler {
                                     _locctr += (s.length() - 3) / 2; // X'05' -> 05 -> 2 half bytes
                                     break;
                             }
-                        } else if (statement.operation().compareTo("BASE") == 0) {
-                            // pass one do nothing to directive 'BASE'
-                        } else {
-                            throw new InvalidOperationCodeException(statement);
-                        }
+                            break;
+                        case "BASE":
+                        case "NOBASE":
+                            break;
+                        default:
+                            if (_opTable.containsKey(statement.operation())) {
+                                switch (_opTable.get(statement.operation()).format()) {
+                                    case "1":
+                                        _locctr += 1;
+                                        break;
+                                    case "2":
+                                        _locctr += 2;
+                                        break;
+                                    case "3/4":
+                                        _locctr += 3 + (statement.isExtended() ? 1 : 0);
+                                        break;
+                                }
+                            } else {
+                                throw new InvalidOperationCodeException(statement);
+                            }
                     }
+                    
+    //                Uncomment the next line can show the Loc and Source statements
+    //                System.out.println(statement);
+                    
+                    objOutputStream.writeObject(statement);
+                } catch (DuplicateSymbolException | InvalidOperationCodeException e) {
+                    System.out.println(e.getMessage());
                 }
-                
-                objOutputStream.writeObject(statement);
             }
             
             _programLength = _locctr - _startAddress;
-            
-            return symTab;
         }
     }
     
-    private void passTwo(File input, Map<String, Integer> symTab, File output) throws IOException, ClassNotFoundException, ExpectedDirectiveNotFoundException {
+    private void processPass2(File input, File output) throws IOException, ClassNotFoundException {
         try (FileInputStream istream = new FileInputStream(input);
              ObjectInputStream objInputStream = new ObjectInputStream(istream);
              FileWriter objectProgram = new FileWriter(output)) {
-            Statement statement = (Statement) objInputStream.readObject();
-            
-            if (statement.operation().compareTo("START") == 0) {
-                objectProgram.write(new HeaderRecord(statement.label(), _startAddress, _programLength).toObjectProgram() + '\n');
-            } else {
-                throw new ExpectedDirectiveNotFoundException("The directive START not found.");
-            }
             
             List<Record> mRecords = new ArrayList<>();
             TextRecord textRecord = new TextRecord(_startAddress);
+            int lastRecordAddress = _startAddress;
             
             while (istream.available() > 0) {
-                statement = (Statement) objInputStream.readObject();
+                Statement statement = (Statement) objInputStream.readObject();
                 
-                if (statement.operation().compareTo("END") != 0) {
-                    if (statement.isComment() == false) {
-                        String objectCode = assembleInstruction(statement, symTab);
-                        
-                        // If it is format 4 and not immediate value
-                        if (statement.isExtended() && symTab.containsKey(statement.operand1())) {
-                            mRecords.add(new ModificationRecord(statement.location() + 1, 5));
-                        }
-                        
-//                        Uncomment next line to show the instruction and corresponding object code
-//                        System.out.println(statement + "\t\t" + objectCode);
-                        
-                        if (textRecord.add(objectCode) == false || statement.operation().compareTo("RESB") == 0) {
-                            objectProgram.write(textRecord.toObjectProgram() + '\n');
-                            
-                            textRecord = new TextRecord(statement.location());
-                            textRecord.add(objectCode);
-                        }
+                if (statement.isComment()) {
+                    continue;
+                }
+                
+                if (statement.compareTo("START") == 0) {
+                    objectProgram.write(new HeaderRecord(statement.label(), _startAddress, _programLength).toObjectProgram() + '\n');
+                } else if (statement.compareTo("END") == 0) {
+                    break;
+                } else {
+                    String objectCode = assembleInstruction(statement);
+
+                    // If it is format 4 and not immediate value
+                    if (statement.isExtended() && _symbolTable.containsKey(statement.operand1())) {
+                        mRecords.add(new ModificationRecord(statement.location() + 1, 5));
                     }
+
+//                    Uncomment next line to show the instruction and corresponding object code
+//                    System.out.println(statement + "\t\t" + objectCode);
+                    
+                    if (statement.location() - lastRecordAddress >= 0x1000 || textRecord.add(objectCode) == false) {
+                        objectProgram.write(textRecord.toObjectProgram() + '\n');
+
+                        textRecord = new TextRecord(statement.location());
+                        textRecord.add(objectCode);
+                    }
+                    
+                    lastRecordAddress = statement.location();
                 }
             }
             
@@ -188,7 +187,7 @@ public class Assembler {
         }
     }
     
-    private String assembleInstruction(Statement statement, Map<String, Integer> symTab) {
+    private String assembleInstruction(Statement statement) {
         String objCode = "";
 
         if (_opTable.containsKey(statement.operation())) {
@@ -200,8 +199,8 @@ public class Assembler {
                 case "2":
                     objCode = _opTable.get(statement.operation()).opcode();
                     
-                    objCode += Integer.toHexString(symTab.get(statement.operand1())).toUpperCase();
-                    objCode += Integer.toHexString(symTab.get(statement.operand2())).toUpperCase();
+                    objCode += Integer.toHexString(_registerTable.get(statement.operand1())).toUpperCase();
+                    objCode += Integer.toHexString(_registerTable.get(statement.operand2())).toUpperCase();
                     
                     break;
                 case "3/4":
@@ -216,30 +215,35 @@ public class Assembler {
                     String operand = statement.operand1();
                     
                     if (operand == null) {
-                        code = (code | n | i) << 12; // for RSUB
+                        code = (code | n | i) << 12; // for RSUB, NOBASE
                     } else {
-                        if (operand.charAt(0) == '#') { // immediate addressing
-                            code |= i;
+                        switch (operand.charAt(0)) {
+                            case '#': // immediate addressing
+                                code |= i;
+                                
+                                operand = operand.substring(1);
+                                break;
+                            case '@': // indirect addressing
+                                code |= n;
 
-                            operand = operand.substring(1);
-                        } else if (operand.charAt(0) == '@') { // indirect addressing
-                            code |= n;
+                                operand = operand.substring(1);
+                                break;
+                            default: // simple/direct addressing
+                                code |= n | i;
 
-                            operand = operand.substring(1);
-                        } else { // simple/direct addressing
-                            code |= n | i;
-
-                            if (statement.operand2() != null) {
-                                code |= x;
-                            }
+                                if (statement.operand2() != null) {
+                                    code |= x;
+                                }
                         }
                         
                         int disp;
                         
-                        if (symTab.get(operand) == null) {
+                        if (_symbolTable.get(operand) == null) {
                             disp = Integer.parseInt(operand);
                         } else {
-                            disp = symTab.get(operand);
+                            int targetAddress = _symbolTable.get(operand);
+                            
+                            disp = targetAddress;
                             
                             if (statement.isExtended() == false) {
                                 disp -= statement.location() + 3;
@@ -249,7 +253,7 @@ public class Assembler {
                                 } else {
                                     code |= b;
                                     
-                                    disp = symTab.get(operand) - _baseAddress;
+                                    disp = targetAddress - _baseAddress;
                                 }
                             }
                         }
@@ -267,12 +271,13 @@ public class Assembler {
                     
                     break;
             }
-        } else if (statement.operation().compareTo("BYTE") == 0) {
+        } else if (statement.compareTo("BYTE") == 0) {
             String s = statement.operand1();
+            char type = s.charAt(0);
             
             s = s.substring(s.indexOf('\'') + 1, s.lastIndexOf('\''));
             
-            switch (statement.operand1().charAt(0)) {
+            switch (type) {
                 case 'C':
                     for (char ch : s.toCharArray()) {
                         objCode += Integer.toHexString(ch).toUpperCase();
@@ -284,10 +289,12 @@ public class Assembler {
                     
                     break;
             }
-        } else if (statement.operation().compareTo("WORD") == 0) {
+        } else if (statement.compareTo("WORD") == 0) {
             // convert constant to object code
-        } else if (statement.operation().compareTo("BASE") == 0) {
-            _baseAddress = symTab.get(statement.operand1());
+        } else if (statement.compareTo("BASE") == 0) {
+            _baseAddress = _symbolTable.get(statement.operand1());
+        } else if (statement.compareTo("NOBASE") == 0) {
+            _baseAddress = 0;
         }
         
         return objCode;
@@ -295,11 +302,9 @@ public class Assembler {
     
     public static void main(String[] args) {
         try {
-            Assembler asm = new Assembler(new File("ValidOperations.txt"));
+            Assembler asm = new Assembler();
             
             asm.assemble(new File("copy.asm"), new File("copy.o"));
-        } catch (DuplicateSymbolException | InvalidOperationCodeException | ExpectedDirectiveNotFoundException e) {
-            System.out.println(e.getMessage());
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         }

@@ -2,7 +2,7 @@ package assembler;
 
 import java.io.Serializable;
 
-public class Statement implements Serializable {
+public class Statement implements Serializable, Comparable {
     private final String _label;
     private final String _operation;
     private final String[] _symbols;
@@ -43,14 +43,14 @@ public class Statement implements Serializable {
     }
     
     public boolean isComment() {
-        return _operation.compareTo(".") == 0;
+        return _comment != null;
     }
     
     public boolean isExtended() {
         return _extended;
     }
     
-    public void setLoc(int loc) {
+    public void setLocation(int loc) {
         _location = loc;
     }
     
@@ -130,5 +130,10 @@ public class Statement implements Serializable {
         }
         
         return s;
+    }
+
+    @Override
+    public int compareTo(Object o) {
+        return _operation.compareTo((String) o);
     }
 }
