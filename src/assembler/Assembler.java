@@ -19,29 +19,55 @@ public class Assembler {
     private int _firstExecAddress;
     private int _programLength;
     private int _baseAddress;
+    private ProcessType _processType;
     private final Map<String, Operation> _opTable;
     private final Map<String, Integer> _registerTable;
-    private final Map<String, Integer> _symbolTable;
+    private final Map _symbolTable;
     
     public Assembler() {
+        this(ProcessType.NORMAL);
+    }
+    
+    public Assembler(ProcessType type) {
         _opTable = Utility.getOperaionTable();
         _registerTable = Utility.getRegisterTable();
         
-        _symbolTable = new HashMap<>();
-        _symbolTable.put(null, 0);
+        _processType = type;
+        
+        switch (type) {
+            case NORMAL:
+                _symbolTable = new HashMap<String, Integer>();
+                _symbolTable.put(null, 0);
+                break;
+            case ONEPASS:
+                _symbolTable = new HashMap<String, Symbol>();
+                
+                break;
+            default:
+                throw new IllegalArgumentException("Illegal process type: " + type);
+        }
     }
     
     public void assemble(File input, File output) throws IOException, ClassNotFoundException {
-        File intermediateFile = new File(".assembler.tmp");
+        switch (_processType) {
+            case NORMAL:
+                File intermediateFile = new File(".intermediate");
+                
+                try {
+                    intermediateFile.createNewFile();
 
-        try {
-            intermediateFile.createNewFile();
+                    processPass1(input, intermediateFile);
 
-            processPass1(input, intermediateFile);
-
-            processPass2(intermediateFile, output);
-        } finally {
-            intermediateFile.delete();
+                    processPass2(intermediateFile, output);
+                } finally {
+                    intermediateFile.delete();
+                }
+            
+                break;
+            case ONEPASS:
+                processOnePass(input, output);
+                
+                break;
         }
     }
     
@@ -55,13 +81,11 @@ public class Assembler {
             
             while (scanner.hasNext()) {
                 try {
-                    Statement statement = Statement.parse(scanner.nextLine());
+                    Statement statement = Statement.parse(scanner.nextLine(), _locctr);
 
                     if (statement.isComment()) {
                         continue;
                     }
-                    
-                    statement.setLocation(_locctr);
                     
                     if (statement.label() != null) {
                         if (_symbolTable.containsKey(statement.label())) {
@@ -193,6 +217,122 @@ public class Assembler {
         }
     }
     
+    private void processOnePass(File input, File output) throws IOException {
+        try (Scanner scanner = new Scanner(input);
+             FileWriter objectProgram = new FileWriter(output)) {
+            
+            String programName = "";
+            List<Record> records = new ArrayList<>();
+            
+            _locctr = _startAddress = 0;
+            _firstExecAddress = -1;
+            
+            int lastRecordAddress = 0;
+            TextRecord tRecord = new TextRecord(_locctr);
+            
+            while (scanner.hasNext()) {
+                try {
+                    Statement statement = Statement.parse(scanner.nextLine(), _locctr);
+
+                    if (statement.isComment()) {
+                        continue;
+                    }
+                    
+                    if (statement.label() != null) {
+                        if (_symbolTable.containsKey(statement.label())) {
+                            Symbol symbol = (Symbol) _symbolTable.get(statement.label());
+                            List<Integer> addresses = symbol.getUnresolvedAddresses();
+                            
+                            records.add(tRecord);
+                            
+                            for (int address : addresses) {
+                                tRecord = new TextRecord(address);
+                                tRecord.add(String.format("%X", _locctr));
+                                
+                                records.add(tRecord);
+                            }
+                            
+                            tRecord = new TextRecord(_locctr);
+                            
+                            symbol.setAddress(_locctr);
+                        } else {
+                            _symbolTable.put(statement.label(), new Symbol(statement.label(), statement.location()));
+                        }
+                    }
+                    
+                    String objCode = "";
+                    
+                    switch (statement.operation()) {
+                        case "START":
+                            programName = statement.label();
+                            _locctr = _startAddress = Integer.parseInt(statement.operand1(), 16);
+                            
+                            statement.setLocation(lastRecordAddress = _locctr);
+                            tRecord = new TextRecord(_locctr);
+                            break;
+                        case "END":
+                            records.add(tRecord);
+                            records.add(new EndRecord(_firstExecAddress));
+                            
+                            break;
+                        case "WORD":
+                            objCode = assembleInstruction(statement);
+                            break;
+                        case "RESW":
+                            _locctr += 3 * Integer.parseInt(statement.operand1());
+                            break;
+                        case "RESB":
+                            _locctr += Integer.parseInt(statement.operand1());
+                            
+                            break;
+                        case "BYTE":
+                            objCode = assembleInstruction(statement);
+                            break;
+                        case "BASE":
+                            _baseAddress = ((Symbol) _symbolTable.get(statement.operand1())).address();
+                            break;
+                        case "NOBASE":
+                            _baseAddress = 0;
+                            break;
+                        default:
+                            if (_opTable.containsKey(statement.operation())) {
+                                if (_firstExecAddress < 0) {
+                                    _firstExecAddress = _locctr;
+                                }
+                                
+                                objCode = assembleInstruction(statement);
+                            } else {
+                                throw new InvalidOperationCodeException(statement);
+                            }
+                    }
+                    
+                    _locctr += objCode.length() / 2;
+                    
+//                    Uncomment next line to show the instruction and corresponding object code
+//                    System.out.println(statement + "\t\t" + objCode);
+                    
+                    if (statement.location() - lastRecordAddress >= 0x1000 || tRecord.add(objCode) == false) {
+                        records.add(tRecord);
+                        
+                        tRecord = new TextRecord(statement.location());
+                        tRecord.add(objCode);
+                    }
+                    
+                    lastRecordAddress = statement.location();
+                } catch (InvalidOperationCodeException e) {
+                    System.out.println(e.getMessage());
+                }
+            }
+            
+            _programLength = _locctr - _startAddress;
+            records.add(0, new HeaderRecord(programName, _startAddress, _programLength));
+            
+            for (Record r : records) {
+                objectProgram.write(r.toObjectProgram() + '\n');
+            }
+        }
+    }
+    
     private String assembleInstruction(Statement statement) {
         String objCode = "";
 
@@ -221,7 +361,11 @@ public class Assembler {
                     String operand = statement.operand1();
                     
                     if (operand == null) {
-                        code = (code | n | i) << 12; // for RSUB, NOBASE
+                        if (_processType == ProcessType.NORMAL) {
+                            code |= n | i;
+                        }
+                        
+                        code <<= 12; // for RSUB, NOBASE
                     } else {
                         switch (operand.charAt(0)) {
                             case '#': // immediate addressing
@@ -235,7 +379,9 @@ public class Assembler {
                                 operand = operand.substring(1);
                                 break;
                             default: // simple/direct addressing
-                                code |= n | i;
+                                if (_processType == ProcessType.NORMAL) {
+                                    code |= n | i;
+                                }
 
                                 if (statement.operand2() != null) {
                                     code |= x;
@@ -245,32 +391,58 @@ public class Assembler {
                         int disp;
                         
                         if (_symbolTable.get(operand) == null) {
-                            disp = Integer.parseInt(operand);
-                        } else {
-                            int targetAddress = _symbolTable.get(operand);
-                            
-                            disp = targetAddress;
-                            
-                            if (statement.isExtended() == false) {
-                                disp -= statement.location() + 3;
+                            try {
+                                disp = Integer.parseInt(operand);
+                            } catch (NumberFormatException ne) {
+                                disp = 0;
+                                code <<= 12;
                                 
-                                if (disp >= -2048 && disp <= 2047) {
-                                    code |= p;
-                                } else {
-                                    code |= b;
+                                Symbol symbol = new Symbol(operand);
+                                symbol.addUnresolvedAddress(statement.location() + 1);
+                                
+                                _symbolTable.put(operand, symbol);
+                            }
+                        } else {
+                            switch (_processType) {
+                                case NORMAL:
+                                    int targetAddress = disp = (int) _symbolTable.get(operand);
                                     
-                                    disp = targetAddress - _baseAddress;
-                                }
+                                    if (statement.isExtended() == false) {
+                                        disp -= statement.location() + 3;
+
+                                        if (disp >= -2048 && disp <= 2047) {
+                                            code |= p;
+                                        } else {
+                                            code |= b;
+
+                                            disp = targetAddress - _baseAddress;
+                                        }
+                                    }
+                                    
+                                    if (statement.isExtended()) {
+                                        code |= e;
+
+                                        code = (code << 20) | (disp & 0xFFFFF);
+                                    } else {
+                                        code = (code << 12) | (disp & 0xFFF);
+                                    }
+                                    
+                                    break;
+                                case ONEPASS:
+                                    Symbol symbol = (Symbol) _symbolTable.get(operand);
+                                    
+                                    if (symbol.beResolved()) {
+                                        disp = symbol.address();
+                                    } else {
+                                        symbol.addUnresolvedAddress(statement.location());
+                                        disp = 0;
+                                    }
+                                    
+                                    code = (code << 12) | (disp & 0xFFFF);
+                                    break;
                             }
                         }
                         
-                        if (statement.isExtended()) {
-                            code |= e;
-                            
-                            code = (code << 20) | (disp & 0xFFFFF);
-                        } else {
-                            code = (code << 12) | (disp & 0xFFF);
-                        }
                     }
                     
                     objCode = String.format(statement.isExtended() ? "%08X" : "%06X", code);
@@ -296,9 +468,9 @@ public class Assembler {
                     break;
             }
         } else if (statement.compareTo("WORD") == 0) {
-            objCode = String.format("%06X", statement.operand1());
+            objCode = String.format("%06X", Integer.parseInt(statement.operand1()));
         } else if (statement.compareTo("BASE") == 0) {
-            _baseAddress = _symbolTable.get(statement.operand1());
+            _baseAddress = (int) _symbolTable.get(statement.operand1());
         } else if (statement.compareTo("NOBASE") == 0) {
             _baseAddress = 0;
         }
@@ -308,7 +480,7 @@ public class Assembler {
     
     public static void main(String[] args) {
         try {
-            Assembler asm = new Assembler();
+            Assembler asm = new Assembler(ProcessType.ONEPASS);
             
             asm.assemble(new File("copy.asm"), new File("copy.o"));
         } catch (IOException | ClassNotFoundException e) {

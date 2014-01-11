@@ -3,14 +3,15 @@ package assembler;
 import java.io.Serializable;
 
 public class Statement implements Serializable, Comparable {
+    private int _location;
     private final String _label;
     private final String _operation;
     private final String[] _symbols;
     private final String _comment;
     private final boolean _extended;
-    private int _location;
     
-    private Statement(String label, String operation, boolean extended, String[] symbols, String comment) {
+    private Statement(int loc, String label, String operation, boolean extended, String[] symbols, String comment) {
+        _location = loc;
         _label = label;
         _operation = operation;
         _extended = extended;
@@ -18,12 +19,12 @@ public class Statement implements Serializable, Comparable {
         _comment = comment;
     }
     
-    public Statement(String label, String operation, boolean extended, String[] symbols) {
-        this(label, operation, extended, symbols, null);
+    public Statement(int loc, String label, String operation, boolean extended, String[] symbols) {
+        this(loc, label, operation, extended, symbols, null);
     }
     
     public Statement(String comment) {
-        this(null, ".", false, null, comment);
+        this(0, null, ".", false, null, comment);
     }
     
     public String label() {
@@ -58,7 +59,7 @@ public class Statement implements Serializable, Comparable {
         return _location;
     }
     
-    public static Statement parse(String statement) {
+    public static Statement parse(String statement, int location) {
         String[] tokens = statement.trim().split("\t");
         
         if (tokens[0].compareTo(".") == 0) {
@@ -95,7 +96,7 @@ public class Statement implements Serializable, Comparable {
                 symbols[0] = symbols[1] = null;
             }
 
-            return new Statement(label, operation, extended, symbols);
+            return new Statement(location, label, operation, extended, symbols);
         }
     }
     
